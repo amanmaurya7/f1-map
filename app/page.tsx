@@ -40,46 +40,43 @@ const COORDINATES: Coordinate[] = [
     return (
       <div className="w-full h-screen flex flex-col bg-gray-100">
         <div className="w-full flex justify-center items-center py-4 bg-white rounded-b-[35px] shadow-md">
-            <div className="map">
-            <Image
+          <Image
             src="/images/head.png"
             alt="header"
             width={100}
             height={50}
             priority
           />
-            </div>
-          
         </div>
-        <div className="flex-1 overflow-hidden px-4 py-2 pb-16"> {/* Added pb-16 for bottom spacing */}
-          <div className="h-full max-w-3xl mx-auto">
-            <div ref={mapRef} className="relative w-full h-full bg-white rounded-lg shadow-lg">
-              <div className="relative w-full h-full">
+        <div className="flex-1 overflow-auto px-4 py-2 pb-16">
+          <div className="mx-auto">
+            <div ref={mapRef} className="relative bg-white rounded-lg shadow-lg" style={{ width: '1000px', height: '800px' }}>
+              <div className="relative">
                 <Image
                   src="/map_image.png"
                   alt="Suzuka Map"
-                  className="w-full h-full object-contain"
-                  width={1000}
-                  height={1000}
+                  width={1000}  // fixed width
+                  height={800}  // fixed height
                   priority
+                  className="w-[1000px] h-[800px]"
                 />
-                {mounted && dimensions.width > 0 && (
+                {mounted && (
                   <>
                     {COORDINATES.map((coord) => (
                       <LocationMarker
                         key={coord.label}
                         coordinate={coord}
-                        position={convertToPixelPosition(coord.lat, coord.lng, dimensions.width, dimensions.height)}
+                        position={convertToPixelPosition(coord.lat, coord.lng, 1000, 800)}
                       />
                     ))}
-                    <UserLocation mapWidth={dimensions.width} mapHeight={dimensions.height} />
+                    <UserLocation mapWidth={1000} mapHeight={800} />
                   </>
                 )}
               </div>
             </div>
           </div>
         </div>
-        <div className="fixed bottom-0 left-0 right-0"> 
+        <div className="fixed bottom-0 left-0 right-0"> {/* Added wrapper for fixed positioning */}
           <F1BottomNavigation />
         </div>
       </div>
