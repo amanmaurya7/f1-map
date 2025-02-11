@@ -72,7 +72,7 @@ export function isWithinBounds(lat: number, lng: number): boolean {
 
 export default function MapPage() {
   const mapRef = useRef<HTMLDivElement>(null)
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
+  const [setDimensions] = useState({ width: 0, height: 0 })
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
