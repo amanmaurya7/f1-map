@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from "react"
 import Image from 'next/image'
 import { LocationMarker } from '../components/location-marker'
 import { UserLocation } from "../components/user-location"
-import  F1BottomNavigation  from "../components/F1BottomNavigation"
+import F1BottomNavigation from "../components/F1BottomNavigation"
 import type { Coordinate } from "../types/map"
 
 // Map boundaries
@@ -21,6 +21,9 @@ const COORDINATES: Coordinate[] = [
   { lat: 34.847328, lng: 136.521328, label: "C" },
   { lat: 34.854529, lng: 136.544621, label: "D" },
 ]
+
+const MAP_WIDTH = 1000
+const MAP_HEIGHT = 800
 
 interface PaddingOptions {
   top?: number;
@@ -72,24 +75,10 @@ export function isWithinBounds(lat: number, lng: number): boolean {
 
 export default function MapPage() {
   const mapRef = useRef<HTMLDivElement>(null)
-  const [setDimensions] = useState({ width: 0, height: 0 })
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    const updateDimensions = () => {
-      if (mapRef.current) {
-        setDimensions({
-          width: mapRef.current.offsetWidth,
-          height: mapRef.current.offsetHeight,
-        })
-      }
-    }
-
-    updateDimensions()
-    window.addEventListener("resize", updateDimensions)
-
-    return () => window.removeEventListener("resize", updateDimensions)
   }, [])
 
   const specificPadding = {
@@ -116,10 +105,10 @@ export default function MapPage() {
             <div 
               ref={mapRef} 
               className="relative bg-white rounded-lg shadow-lg" 
-              style={{ width: '1000px', height: '800px' }}
+              style={{ width: `${MAP_WIDTH}px`, height: `${MAP_HEIGHT}px` }}
             >
               <div
-                className="relative w-[1000px] h-[800px]"
+                className="relative w-full h-full"
                 style={{
                   backgroundImage: 'url(/map_image.png)',
                   backgroundSize: 'cover',
@@ -135,13 +124,13 @@ export default function MapPage() {
                         position={convertToPixelPosition(
                           coord.lat, 
                           coord.lng, 
-                          1000, 
-                          800, 
+                          MAP_WIDTH, 
+                          MAP_HEIGHT, 
                           specificPadding
                         )} 
                       />
                     ))}
-                    <UserLocation mapWidth={1000} mapHeight={800} />
+                    <UserLocation mapWidth={MAP_WIDTH} mapHeight={MAP_HEIGHT} />
                   </>
                 )}
               </div>

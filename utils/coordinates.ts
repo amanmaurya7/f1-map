@@ -7,7 +7,7 @@ const MAP_BOUNDS = {
   }
   
   // Convert GPS coordinates to pixel positions on the map
-  export function convertToPixelPosition(lat: number, lng: number, mapWidth: number, mapHeight: number, p0: { USER: { top: number; bottom: number; left: number; right: number } }) {
+  export function convertToPixelPosition(lat: number, lng: number, mapWidth: number, mapHeight: number) {
     const latRange = MAP_BOUNDS.north - MAP_BOUNDS.south
     const lngRange = MAP_BOUNDS.east - MAP_BOUNDS.west
   
