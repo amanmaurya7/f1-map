@@ -77,10 +77,18 @@ function isWithinBounds(lat: number, lng: number): boolean {
 export default function MapPage() {
   const mapRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
+  const [showOutOfBoundsMessage, setShowOutOfBoundsMessage] = useState(false)
+  const [userLocation, setUserLocation] = useState<GeolocationPosition | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Handler for location updates from UserLocation component
+  const handleLocationUpdate = (lat: number, lng: number) => {
+    const withinBounds = isWithinBounds(lat, lng)
+    setShowOutOfBoundsMessage(!withinBounds)
+  }
 
   const specificPadding = {
     A: { left: 0.18, top: 0.18 },
@@ -101,11 +109,20 @@ export default function MapPage() {
             priority 
           />
         </div>
+        
+        {/* Add out of bounds message */}
+        {showOutOfBoundsMessage && (
+          <div className="w-full bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <strong className="font-bold">Notice: </strong>
+            <span className="block sm:inline">Your current location is out of bounds and has been disabled.</span>
+          </div>
+        )}
+
         <div className="flex-1 overflow-auto px-4 py-2 pb-16">
           <div className="mx-auto">
             <div 
               ref={mapRef} 
-              className="relative bg-white rounded-lg shadow-lg" 
+              className="relative" 
               style={{ width: `${MAP_WIDTH}px`, height: `${MAP_HEIGHT}px` }}
             >
               <div
@@ -131,7 +148,12 @@ export default function MapPage() {
                         )} 
                       />
                     ))}
-                    <UserLocation mapWidth={MAP_WIDTH} mapHeight={MAP_HEIGHT} />
+                    <UserLocation 
+                      mapWidth={MAP_WIDTH} 
+                      mapHeight={MAP_HEIGHT} 
+                      onLocationUpdate={handleLocationUpdate}
+                      isVisible={!showOutOfBoundsMessage}
+                    />
                   </>
                 )}
               </div>
