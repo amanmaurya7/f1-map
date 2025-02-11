@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client"
 
 import { useRef, useState, useEffect } from "react"
@@ -32,7 +33,7 @@ interface PaddingOptions {
   right?: number;
 }
 
-export function convertToPixelPosition(
+function convertToPixelPosition(
   lat: number, 
   lng: number, 
   mapWidth: number, 
@@ -68,7 +69,7 @@ export function convertToPixelPosition(
   return { x, y }
 }
 
-export function isWithinBounds(lat: number, lng: number): boolean {
+function isWithinBounds(lat: number, lng: number): boolean {
   return lat >= MAP_BOUNDS.south && lat <= MAP_BOUNDS.north && 
          lng >= MAP_BOUNDS.west && lng <= MAP_BOUNDS.east
 }
