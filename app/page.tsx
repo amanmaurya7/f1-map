@@ -194,7 +194,7 @@ export default function MapPage() {
   }, [handleWheel])
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
+    <div className={`h-screen flex flex-col ${showOutOfBoundsMessage ? 'bg-red-50' : 'bg-gray-100'}`}>
       {/* Fixed Header */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <div className="w-full flex justify-center items-center py-4 bg-white rounded-b-[35px] shadow-md">
