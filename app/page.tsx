@@ -194,8 +194,8 @@ export default function MapPage() {
   }, [handleWheel])
 
   return (
-    <div className={`h-screen flex flex-col ${showOutOfBoundsMessage ? 'bg-red-50' : 'bg-gray-100'}`}>
-      {/* Fixed Header */}
+    <div className={`h-screen flex flex-col relative ${showOutOfBoundsMessage ? 'bg-red-50' : 'bg-gray-100'}`}>
+      {/* Static Header */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <div className="w-full flex justify-center items-center py-4 bg-white rounded-b-[35px] shadow-md">
           <Image
@@ -206,18 +206,17 @@ export default function MapPage() {
             priority 
           />
         </div>
-      </div>
 
-      {/* Main scrollable content area with top padding for header */}
-      <div className="flex-1 overflow-auto mt-[84px] mb-[64px]">
-        {/* Out of bounds message */}
+        {/* Out of bounds message - Now positioned directly below header */}
         {showOutOfBoundsMessage && (
-          <div className="w-full bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <strong className="font-bold">Notice: </strong>
+          <div className="w-full bg-red-100 border text-red-700 px-4 py-3 text-center" role="alert">
             <span className="block sm:inline">Your current location is out of bounds and has been disabled.</span>
           </div>
         )}
+      </div>
 
+      {/* Main scrollable content area with top padding for header and potential message */}
+      <div className="flex-1 overflow-auto" style={{ marginTop: showOutOfBoundsMessage ? '140px' : '84px', marginBottom: '64px' }}>
         {/* Map container */}
         <div className="mx-auto px-4 py-2">
           <div 
