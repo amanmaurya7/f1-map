@@ -1,6 +1,5 @@
 "use client"
-
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { isWithinBounds, convertToPixelPosition } from "../utils/coordinates"
 import { getNetworkStatus, monitorNetworkChanges } from "../utils/network"
 
@@ -9,12 +8,38 @@ interface UserLocationProps {
   mapHeight: number
   onLocationUpdate?: (lat: number, lng: number) => void
   isVisible?: boolean
+  scale?: number
+  offset?: {
+    top?: number;
+    right?: number;
+    bottom?: number;
+    left?: number;
+  }
 }
 
-export function UserLocation({ mapWidth, mapHeight, onLocationUpdate, isVisible = true }: UserLocationProps) {
+export function UserLocation({
+  mapWidth,
+  mapHeight,
+  onLocationUpdate,
+  isVisible = true,
+  scale = 1,
+  offset = { top: 0, right: 0, bottom: 0, left: 0  }
+}: UserLocationProps) {
   const [position, setPosition] = useState<GeolocationPosition | null>(null)
   const [isOutOfBounds, setIsOutOfBounds] = useState(false)
   const [networkStatus, setNetworkStatus] = useState<{ type: string; speed?: number }>({ type: 'unknown' })
+  
+  // Base size for the marker
+  const baseSize = 24
+  const size = baseSize * scale
+
+  // Normalize offset object with defaults
+  const normalizedOffset = {
+    top: offset.top ?? 0,
+    right: offset.right ?? 0,
+    bottom: offset.bottom ?? 0,
+    left: offset.left ?? 0
+  }
 
   useEffect(() => {
     getNetworkStatus().then(setNetworkStatus);
@@ -51,51 +76,66 @@ export function UserLocation({ mapWidth, mapHeight, onLocationUpdate, isVisible 
 
   if (!position || isOutOfBounds || !isVisible) return null
 
-  const pixelPosition = convertToPixelPosition(position.coords.latitude, position.coords.longitude, mapWidth, mapHeight)
+  const pixelPosition = convertToPixelPosition(
+    position.coords.latitude,
+    position.coords.longitude,
+    mapWidth,
+    mapHeight
+  )
+
+  // Calculate final position with offsets
+  const finalLeft = pixelPosition.x - (size / 2) + normalizedOffset.left - normalizedOffset.right
+  const finalTop = pixelPosition.y - size + normalizedOffset.top - normalizedOffset.bottom
 
   return (
     <div
-      className="absolute transform -translate-x-1/2 -translate-y-1/2"
+      className="absolute"
       style={{
-        left: `${pixelPosition.x}px`,
-        top: `${pixelPosition.y}px`,
+        left: `${finalLeft}px`,
+        top: `${finalTop}px`,
+        transition: 'transform 0.2s ease-out',
       }}
     >
-      <svg width="70" height="70" viewBox="0 0 50 50">
-        <g transform="translate(-193 -540)">
+      <div className="relative">
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <circle
-            cx="25"
-            cy="25"
-            r="25"
-            transform="translate(193 540)"
+            cx="12"
+            cy="12"
+            r="6"
             fill="#e50111"
-            opacity="0.08"
+            fillOpacity="0.8"
+            stroke="#FFFFFF"
+            strokeWidth="2"
           />
-          <circle
-            cx="17.5"
-            cy="17.5"
-            r="17.5"
-            transform="translate(201 548)"
-            fill="#e50111"
-            opacity="0.08"
-          />
-          <circle
-            cx="8.5"
-            cy="8.5"
-            r="8.5"
-            transform="translate(210 557)"
-            fill="#e50111"
-            opacity="0.08"
-          />
-          <circle
-            cx="4"
-            cy="4"
-            r="4"
-            transform="translate(214 561)"
-            fill="#e50111"
-          />
-        </g>
-      </svg>
+        </svg>
+       
+        <div
+          className="absolute top-0 left-0 w-full h-full animate-ping"
+          style={{ transform: `scale(${scale})` }}
+        >
+          <svg
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="8"
+              fill="#e50111"
+              fillOpacity="0.3"
+            />
+          </svg>
+        </div>
+      </div>
     </div>
   )
 }

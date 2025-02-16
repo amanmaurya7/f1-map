@@ -8,6 +8,7 @@ import { LocationMarker } from "../components/location-marker"
 import { UserLocation } from "../components/user-location"
 import F1BottomNavigation from "../components/F1BottomNavigation"
 import type { Coordinate } from "../types/map"
+import { calculateInitialZoom } from "../utils/viewport"
 
 // Map boundaries
 const MAP_BOUNDS = {
@@ -24,8 +25,16 @@ const COORDINATES: Coordinate[] = [
   { lat: 34.854529, lng: 136.544621, label: "D" },
 ]
 
-const MAP_WIDTH = 1000
-const MAP_HEIGHT = 800
+// Make map dimensions responsive
+const getMapDimensions = () => {
+  if (typeof window !== 'undefined') {
+    const width = Math.min(window.innerWidth, 1000)
+    const aspectRatio = 800 / 1000 // original height/width
+    const height = width * aspectRatio
+    return { width, height }
+  }
+  return { width: 1000, height: 800 } // fallback for SSR
+}
 
 interface PaddingOptions {
   top?: number
@@ -47,7 +56,7 @@ function convertToPixelPosition(
   const lngRange = MAP_BOUNDS.east - MAP_BOUNDS.west
 
   const defaultPadding = {
-    top: 0.15,
+    top: 0.16,
     bottom: 0.1,
     left: 0.1,
     right: 0.3,
@@ -77,19 +86,55 @@ export default function MapPage() {
   const mapRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
   const [showOutOfBoundsMessage, setShowOutOfBoundsMessage] = useState(false)
-  const [zoom, setZoom] = useState(1)
+  const [zoom, setZoom] = useState(0.1) // Start with small zoom until calculated
   const [isDragging, setIsDragging] = useState(false)
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
   const [touchPoints, setTouchPoints] = useState<Touch[]>([])
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null)
   const [isBackgroundMode, setIsBackgroundMode] = useState(false)
+  const [userLocation, setUserLocation] = useState<Coordinate | null>(null)
+  const [mapDimensions, setMapDimensions] = useState({ width: 1000, height: 800 })
+  const [pinScale, setPinScale] = useState(1)
 
   const MAX_ZOOM = 50
   const MIN_ZOOM = 0.01
+  
+  // Calculate pin scale based on zoom level
+  useEffect(() => {
+    if (zoom > 0) {
+      // Inverse relationship: as zoom increases, pin size decreases
+      const newScale = 1 / Math.sqrt(zoom)
+      
+      // Clamp the scale between 0.4 (minimum size) and 1.5 (maximum size)
+      const clampedScale = Math.min(Math.max(newScale, 0.4), 1.5)
+      
+      setPinScale(clampedScale)
+    }
+  }, [zoom])
+
+  // Update map dimensions on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setMapDimensions(getMapDimensions())
+    }
+    
+    if (typeof window !== 'undefined') {
+      setMapDimensions(getMapDimensions())
+      window.addEventListener('resize', handleResize)
+      return () => window.removeEventListener('resize', handleResize)
+    }
+  }, [])
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (mounted) {
+      const initialZoom = calculateInitialZoom(mapDimensions.width, mapDimensions.height)
+      setZoom(initialZoom)
+    }
+  }, [mounted, mapDimensions])
 
   useEffect(() => {
     if ('getBattery' in navigator) {
@@ -111,13 +156,16 @@ export default function MapPage() {
   const handleLocationUpdate = (lat: number, lng: number) => {
     const withinBounds = isWithinBounds(lat, lng)
     setShowOutOfBoundsMessage(!withinBounds)
+    if (withinBounds) {
+      setUserLocation({ lat, lng, label: "User" })
+    }
   }
 
   const specificPadding = {
-    A: { left: 0.18, top: 0.18 },
-    B: { right: 0.27, bottom: 0.14 },
-    C: { left: 0.048, bottom: 0.022 },
-    D: { right: 0.284, top: 0.219 },
+    A: { left: 0.18, top: 0.21 },
+    B: { right: 0.27, bottom: 0.13 },
+    C: { left: 0.048, bottom: 0.012 },
+    D: { right: 0.284, top: 0.234 },
   }
 
   const handleWheel = useCallback(
@@ -145,15 +193,25 @@ export default function MapPage() {
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (e.touches.length === 2) {
       const touches = Array.from(e.touches)
-      const distance = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY)
-      const prevDistance = Math.hypot(
-        touchPoints[1].clientX - touchPoints[0].clientX,
-        touchPoints[1].clientY - touchPoints[0].clientY,
-      )
-
-      const zoomFactor = distance / prevDistance
-      const newZoom = Math.min(Math.max(MIN_ZOOM, zoom * zoomFactor), MAX_ZOOM)
-      setZoom(newZoom)
+      
+      // Calculate the new zoom based on pinch gesture
+      if (touchPoints.length === 2) {
+        const currentDistance = Math.hypot(
+          touches[0].clientX - touches[1].clientX,
+          touches[0].clientY - touches[1].clientY
+        )
+        const previousDistance = Math.hypot(
+          touchPoints[0].clientX - touchPoints[1].clientX,
+          touchPoints[0].clientY - touchPoints[1].clientY
+        )
+        
+        if (previousDistance > 0) {
+          const delta = currentDistance / previousDistance
+          const newZoom = Math.min(Math.max(MIN_ZOOM, zoom * delta), MAX_ZOOM)
+          setZoom(newZoom)
+        }
+      }
+      
       setTouchPoints(touches)
     } else if (e.touches.length === 1 && isDragging && touchStart) {
       setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY })
@@ -217,100 +275,128 @@ export default function MapPage() {
     }
   }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd])
 
+  const getTransformOrigin = () => {
+    if (userLocation) {
+      const { x, y } = convertToPixelPosition(
+        userLocation.lat, 
+        userLocation.lng, 
+        mapDimensions.width, 
+        mapDimensions.height, 
+        specificPadding
+      )
+      return `${x}px ${y}px`
+    }
+    return "center center"
+  }
+
+  // Calculate safe area for header
+  const headerHeight = showOutOfBoundsMessage ? 140 : 84
+  const bottomNavHeight = 64
+
   return (
-    <div className={`h-screen flex flex-col relative ${showOutOfBoundsMessage ? "bg-red-50" : "bg-gray-100"}`}>
+    <div className="h-screen w-full flex flex-col relative bg-gray-100 overflow-hidden">
       {/* Static Header */}
       <div className="fixed top-0 left-0 right-0 z-50">
-        <div className="w-full flex justify-center items-center py-4 bg-white rounded-b-[35px] shadow-md">
-          <Image src="/images/head.png" alt="header" width={100} height={50} priority />
+        <div className="w-full flex justify-center items-center py-3 bg-white rounded-b-[35px] shadow-md">
+          <Image src="/images/head.png" alt="header" width={90} height={45} priority className="w-auto h-auto" />
         </div>
 
         {showOutOfBoundsMessage && (
-          <div className="w-full bg-red-100 border text-red-700 px-4 py-3 text-center" role="alert">
-            <span className="block sm:inline">Your current location is out of bounds and has been disabled.</span>
+          <div className="w-full bg-red-100 border text-red-700 px-4 py-2 text-center text-sm" role="alert">
+            <span className="block">Your current location is out of bounds and has been disabled.</span>
           </div>
         )}
       </div>
 
       {batteryLevel !== null && batteryLevel < 20 && (
-        <div className="fixed top-20 left-0 right-0 bg-yellow-100 border text-yellow-700 px-4 py-3 text-center" role="alert">
-          <span className="block sm:inline">Battery level is low ({Math.round(batteryLevel)}%)</span>
+        <div className="fixed top-20 left-0 right-0 bg-yellow-100 border text-yellow-700 px-4 py-2 text-center text-sm" role="alert">
+          <span className="block">Battery level is low ({Math.round(batteryLevel)}%)</span>
         </div>
       )}
 
-      {/* Main scrollable content area with top padding for header and potential message */}
-      <div
-        className="flex-1 overflow-auto"
-        style={{ marginTop: showOutOfBoundsMessage ? "140px" : "84px", marginBottom: "64px" }}
+      {/* Main content area that centers the map */}
+      <div 
+        className="flex-1 flex items-center justify-center"
+        style={{ 
+          marginTop: `${headerHeight}px`, 
+          marginBottom: `${bottomNavHeight}px`,
+          overflow: 'hidden'
+        }}
       >
-        <div className="mx-auto px-4 py-2 flex justify-center items-center">
-          <div
-            ref={mapRef}
-            className="relative"
-            style={{
-              width: `${MAP_WIDTH}px`,
-              height: `${MAP_HEIGHT}px`,
-              transform: `scale(${zoom})`,
-              transformOrigin: "center center",
-            }}
-            onDoubleClick={handleDoubleClick}
-          >
-            {/* Replace background-image with Next.js Image component */}
-            <div className="relative w-full h-full flex items-center justify-center">
-              <Image
+        <div
+          ref={mapRef}
+          className="relative touch-manipulation"
+          style={{
+            width: `${mapDimensions.width}px`,
+            height: `${mapDimensions.height}px`,
+            transform: `scale(${zoom})`,
+            transformOrigin: getTransformOrigin(),
+          }}
+          onDoubleClick={handleDoubleClick}
+        >
+          <div className="relative w-full h-full">
+            <Image
               src="/map_image.png"
               alt="Circuit map"
-              width={MAP_WIDTH}
-              height={MAP_HEIGHT}
+              width={mapDimensions.width}
+              height={mapDimensions.height}
               priority
               className="ios-image-fix w-full h-full object-cover"
               style={{
-              imageOrientation: "from-image",
+                imageOrientation: "from-image",
               }}
-              />
-              {mounted && (
-                <div className="absolute inset-0 flex items-center justify-center">
+            />
+            {mounted && (
+              <div className="absolute inset-0">
                 {COORDINATES.map((coord) => (
-                <LocationMarker
-                  key={coord.label}
-                  coordinate={coord}
-                  position={convertToPixelPosition(coord.lat, coord.lng, MAP_WIDTH, MAP_HEIGHT, specificPadding)}
-                />
+                  <LocationMarker
+                    key={coord.label}
+                    coordinate={coord}
+                    position={convertToPixelPosition(
+                      coord.lat, 
+                      coord.lng, 
+                      mapDimensions.width, 
+                      mapDimensions.height, 
+                      specificPadding
+                    )}
+                    scale={pinScale} // Pass the calculated pin scale
+                  />
                 ))}
                 <UserLocation
-                mapWidth={MAP_WIDTH}
-                mapHeight={MAP_HEIGHT}
-                onLocationUpdate={handleLocationUpdate}
-                isVisible={!showOutOfBoundsMessage}
+                  mapWidth={mapDimensions.width}
+                  mapHeight={mapDimensions.height}
+                  onLocationUpdate={handleLocationUpdate}
+                  isVisible={!showOutOfBoundsMessage}
+                  scale={pinScale} // Also scale the user location pin
                 />
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Fixed zoom controls */}
+      {/* Zoom controls */}
       <div className="fixed bottom-20 right-4 flex flex-col gap-2 z-50">
         <button
-          className="bg-white rounded-full w-10 h-10 shadow-lg flex items-center justify-center text-black"
+          className="bg-white rounded-full w-10 h-10 shadow-lg flex items-center justify-center text-black touch-manipulation"
           onClick={handleZoomIn}
+          aria-label="Zoom in"
         >
           <span className="text-2xl">+</span>
         </button>
         <button
-          className="bg-white rounded-full w-10 h-10 shadow-lg flex items-center justify-center text-black"
+          className="bg-white rounded-full w-10 h-10 shadow-lg flex items-center justify-center text-black touch-manipulation"
           onClick={handleZoomOut}
+          aria-label="Zoom out"
         >
           <span className="text-2xl">-</span>
         </button>
       </div>
 
-      {/* Fixed Bottom Navigation */}
+      {/* Bottom navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50">
         <F1BottomNavigation />
       </div>
     </div>
   )
 }
-
