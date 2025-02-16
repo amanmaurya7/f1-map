@@ -18,4 +18,35 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .ios-image-fix {
+    image-orientation: from-image;
+    -webkit-image-orientation: from-image;
+    transform: rotate(0deg);
+    -webkit-transform: rotate(0deg);
+  }
+}
+
+/* Additional iOS fixes */
+img {
+  /* Prevent iOS from applying automatic orientation */
+  image-orientation: none;
+  -webkit-image-orientation: none;
+}
+
+.map-container {
+  /* Force hardware acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000;
+  -webkit-perspective: 1000;
+}
+

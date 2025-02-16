@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { isWithinBounds, convertToPixelPosition } from "../utils/coordinates"
+import { getNetworkStatus, monitorNetworkChanges } from "../utils/network"
 
 interface UserLocationProps {
   mapWidth: number
@@ -13,6 +14,12 @@ interface UserLocationProps {
 export function UserLocation({ mapWidth, mapHeight, onLocationUpdate, isVisible = true }: UserLocationProps) {
   const [position, setPosition] = useState<GeolocationPosition | null>(null)
   const [isOutOfBounds, setIsOutOfBounds] = useState(false)
+  const [networkStatus, setNetworkStatus] = useState<{ type: string; speed?: number }>({ type: 'unknown' })
+
+  useEffect(() => {
+    getNetworkStatus().then(setNetworkStatus);
+    return monitorNetworkChanges(setNetworkStatus);
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -20,24 +27,27 @@ export function UserLocation({ mapWidth, mapHeight, onLocationUpdate, isVisible 
       return
     }
 
+    const options = {
+      enableHighAccuracy: true,
+      timeout: networkStatus.type === 'wifi' ? 5000 : 10000,
+      maximumAge: networkStatus.type === 'wifi' ? 0 : 5000,
+    }
+
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         setPosition(pos)
-        setIsOutOfBounds(!isWithinBounds(pos.coords.latitude, pos.coords.longitude))
+        const withinBounds = isWithinBounds(pos.coords.latitude, pos.coords.longitude)
+        setIsOutOfBounds(!withinBounds)
         onLocationUpdate?.(pos.coords.latitude, pos.coords.longitude)
       },
       (error) => {
         console.error("Error getting location:", error)
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0,
-      },
+      options
     )
 
     return () => navigator.geolocation.clearWatch(watchId)
-  }, [onLocationUpdate])
+  }, [onLocationUpdate, networkStatus.type])
 
   if (!position || isOutOfBounds || !isVisible) return null
 
