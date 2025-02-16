@@ -383,29 +383,22 @@ export default function MapPage() {
             width: `${mapDimensions.width}px`,
             height: `${mapDimensions.height}px`,
             transform: `scale(${zoom})`,
-            transformOrigin: getTransformOrigin(),
+            // transformOrigin: getTransformOrigin(),
           }}
           onDoubleClick={handleDoubleClick}
         >
-          <div
-            className="relative bg-[url('/map_image.png')] bg-cover bg-center"
-            style={{
-              width: `${mapDimensions.width}px`,
-              height: `${mapDimensions.height}px`,
-              imageOrientation: "from-image",
-            }}
-          >
-            {/* <Image
+          <div className="relative w-full h-full">
+            <Image
               src="/map_image.png"
               alt="Circuit map"
               width={mapDimensions.width}
               height={mapDimensions.height}
               priority
               className="w-full h-full object-cover"
-              style={{
-                imageOrientation: "from-image",
-              }}
-            /> */}
+              // style={{
+              //   imageOrientation: "from-image",
+              // }}
+            />
             {mounted && (
               <div className="absolute inset-0">
                 {COORDINATES.map((coord) => (
@@ -416,8 +409,8 @@ export default function MapPage() {
                       coord.lat,
                       coord.lng,
                       mapDimensions.width,
-                      mapDimensions.height
-                      // specificPadding
+                      mapDimensions.height,
+                      specificPadding
                     )}
                     scale={pinScale} // Pass the calculated pin scale
                   />
