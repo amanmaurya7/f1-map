@@ -383,7 +383,6 @@ export default function MapPage() {
             width: `${mapDimensions.width}px`,
             height: `${mapDimensions.height}px`,
             transform: `scale(${zoom})`,
-            // transformOrigin: getTransformOrigin(),
           }}
           onDoubleClick={handleDoubleClick}
         >
