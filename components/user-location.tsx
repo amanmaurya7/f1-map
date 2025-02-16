@@ -1,7 +1,7 @@
 "use client"
 import React, { useEffect, useState } from "react"
 import { isWithinBounds, convertToPixelPosition } from "../utils/coordinates"
-import { getNetworkStatus, monitorNetworkChanges } from "../utils/network"
+import { getNetworkStatus, monitorNetworkChanges } from '../utils/network'
 
 interface UserLocationProps {
   mapWidth: number

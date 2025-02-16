@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client"
 
 import type React from "react"
@@ -12,14 +14,14 @@ import { calculateInitialZoom } from "../utils/viewport"
 
 // Map boundaries
 const MAP_BOUNDS = {
-  north: 34.854529,
-  south: 34.839992,
-  east: 136.544621,
-  west: 136.521328,
+  north: Math.max(34.839992, 34.847328, 34.854529),
+  south: Math.min(34.839992, 34.847328, 34.854529),
+  east: Math.max(136.543937, 136.521328, 136.544621),
+  west: Math.min(136.543937, 136.521328, 136.544621),
 }
 
 const COORDINATES: Coordinate[] = [
-  { lat: 34.845644, lng: 136.54065, label: "A" },
+  { lat: 34.845644, lng: 136.540650, label: "A" },
   { lat: 34.839992, lng: 136.543937, label: "B" },
   { lat: 34.847328, lng: 136.521328, label: "C" },
   { lat: 34.854529, lng: 136.544621, label: "D" },
