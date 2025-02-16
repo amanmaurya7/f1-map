@@ -387,8 +387,15 @@ export default function MapPage() {
           }}
           onDoubleClick={handleDoubleClick}
         >
-          <div className="relative w-full h-full">
-            <Image
+          <div
+            className="relative bg-[url('/map_image.png')] bg-cover bg-center"
+            style={{
+              width: `${mapDimensions.width}px`,
+              height: `${mapDimensions.height}px`,
+              imageOrientation: "from-image",
+            }}
+          >
+            {/* <Image
               src="/map_image.png"
               alt="Circuit map"
               width={mapDimensions.width}
@@ -398,7 +405,7 @@ export default function MapPage() {
               style={{
                 imageOrientation: "from-image",
               }}
-            />
+            /> */}
             {mounted && (
               <div className="absolute inset-0">
                 {COORDINATES.map((coord) => (
@@ -409,8 +416,8 @@ export default function MapPage() {
                       coord.lat,
                       coord.lng,
                       mapDimensions.width,
-                      mapDimensions.height,
-                      specificPadding
+                      mapDimensions.height
+                      // specificPadding
                     )}
                     scale={pinScale} // Pass the calculated pin scale
                   />
