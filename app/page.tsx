@@ -329,6 +329,35 @@ export default function MapPage() {
   const headerHeight = showOutOfBoundsMessage ? 140 : 84;
   const bottomNavHeight = 64;
 
+  // Update user location every 2 seconds
+  useEffect(() => {
+    let watchId: number;
+
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          handleLocationUpdate(latitude, longitude);
+        },
+        (error) => {
+          console.error("Error getting user location:", error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+    }
+
+    // Cleanup function to stop watching location
+    return () => {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, []); // Empty dependency array means this only runs once on mount
+
   return (
     <div className="h-screen w-full flex flex-col relative bg-gray-100 overflow-hidden">
       {/* Static Header */}

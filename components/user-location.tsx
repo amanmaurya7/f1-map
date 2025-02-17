@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client"
 import React, { useEffect, useState } from "react"
 import { isWithinBounds, convertToPixelPosition } from "../utils/coordinates"
@@ -47,32 +48,83 @@ export function UserLocation({
   }, []);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      console.error("Geolocation is not supported by this browser.")
-      return
-    }
+    if (!navigator.geolocation) return;
+
+    let lastUpdate = 0;
+    let lastPosition: GeolocationPosition | null = null;
+    const DEBUG = false; // Set to true only when debugging
+
+    const MIN_UPDATE_INTERVAL = 30000; // Increased to 30 seconds
+    const MIN_DISTANCE_CHANGE = 10; // Increased to 10 meters
+
+    const calculateDistance = (pos1: GeolocationPosition, pos2: GeolocationPosition) => {
+      const R = 6371e3; // Earth's radius in meters
+      const φ1 = pos1.coords.latitude * Math.PI/180;
+      const φ2 = pos2.coords.latitude * Math.PI/180;
+      const Δφ = (pos2.coords.latitude - pos1.coords.latitude) * Math.PI/180;
+      const Δλ = (pos2.coords.longitude - pos1.coords.longitude) * Math.PI/180;
+
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+      return R * c;
+    };
+
+    const handlePositionUpdate = (pos: GeolocationPosition) => {
+      const now = Date.now();
+      
+      // Skip updates if not enough time has passed
+      if (now - lastUpdate < MIN_UPDATE_INTERVAL) return;
+      
+      // Skip updates if position hasn't changed enough
+      if (lastPosition) {
+        const distance = calculateDistance(lastPosition, pos);
+        if (distance < MIN_DISTANCE_CHANGE) return;
+      }
+
+      lastUpdate = now;
+      lastPosition = pos;
+      
+      // Only update state if bounds changed
+      const withinBounds = isWithinBounds(pos.coords.latitude, pos.coords.longitude);
+      if (withinBounds !== !isOutOfBounds) {
+        setIsOutOfBounds(!withinBounds);
+      }
+      
+      // Only update position if it's valid
+      if (withinBounds) {
+        setPosition(pos);
+        onLocationUpdate?.(pos.coords.latitude, pos.coords.longitude);
+      }
+
+      // Only log in debug mode
+      if (DEBUG) {
+        console.log('Position updated:', {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        });
+      }
+    };
 
     const options = {
       enableHighAccuracy: true,
-      timeout: networkStatus.type === 'wifi' ? 5000 : 10000,
-      maximumAge: networkStatus.type === 'wifi' ? 0 : 5000,
-    }
+      timeout: 20000,
+      maximumAge: 30000, // Increased cache time
+    };
 
     const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        setPosition(pos)
-        const withinBounds = isWithinBounds(pos.coords.latitude, pos.coords.longitude)
-        setIsOutOfBounds(!withinBounds)
-        onLocationUpdate?.(pos.coords.latitude, pos.coords.longitude)
-      },
+      handlePositionUpdate,
       (error) => {
-        console.error("Error getting location:", error)
+        if (DEBUG) console.error("Geolocation error:", error);
       },
       options
-    )
+    );
 
-    return () => navigator.geolocation.clearWatch(watchId)
-  }, [onLocationUpdate, networkStatus.type])
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [onLocationUpdate]);
 
   if (!position || isOutOfBounds || !isVisible) return null
 

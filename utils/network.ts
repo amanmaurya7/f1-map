@@ -41,6 +41,9 @@ export function monitorNetworkChanges(
     });
   };
 
-  connection.addEventListener("change", handler);
-  return () => connection.removeEventListener("change", handler);
+  // Check network status every 2 seconds
+  const intervalId = setInterval(handler, 2000);
+
+  // Return a function to clear the interval
+  return () => clearInterval(intervalId);
 }
