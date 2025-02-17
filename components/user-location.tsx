@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-constraint */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -42,9 +43,12 @@ export function UserLocation({
     isStable: true
   });
   const [recentPositions, setRecentPositions] = useState<GeolocationPosition[]>([]);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const lastUpdateRef = useRef<number>(0);
   const lastPositionRef = useRef<GeolocationPosition | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const isMountedRef = useRef(true);
 
   const MIN_UPDATE_INTERVAL = 500; // 500ms minimum time between updates
   const MIN_DISTANCE_CHANGE = 10; // 10 meters minimum distance change
@@ -128,33 +132,135 @@ export function UserLocation({
     };
   }, []);
 
-  useEffect(() => {
-    const cleanup = monitorNetworkChanges(setNetworkStatus);
-    return cleanup;
+  const safeSetState = useCallback(<T extends unknown>(
+    setter: React.Dispatch<React.SetStateAction<T>>,
+    value: T
+  ) => {
+    if (isMountedRef.current) {
+      setter(value);
+    }
+  }, []);
+
+  const initializeGeolocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported");
+      return;
+    }
+
+    try {
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: networkStatus.isOnline ? 30000 : 60000,
+      };
+
+      // Clear existing watch
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (!isMountedRef.current) return;
+          
+          // Wrap in try-catch for iOS Safari
+          try {
+            setTimeout(() => {
+              if (isMountedRef.current) {
+                debouncedPositionUpdate(pos);
+              }
+            }, 300);
+          } catch (error) {
+            console.error("Position update error:", error);
+          }
+        },
+        (error) => {
+          if (!isMountedRef.current) return;
+          
+          console.error("Geolocation error:", error);
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              safeSetState<string | null>(setLocationError, "Location permission denied");
+              break;
+            case error.POSITION_UNAVAILABLE:
+              safeSetState<string | null>(setLocationError, "Location unavailable");
+              break;
+            case error.TIMEOUT:
+              safeSetState<string | null>(setLocationError, "Location request timed out");
+              // Retry after timeout
+              setTimeout(initializeGeolocation, 5000);
+              break;
+            default:
+              safeSetState<string | null>(setLocationError, "Location error occurred");
+          }
+        },
+        options
+      );
+    } catch (error) {
+      console.error("Geolocation setup error:", error);
+      setLocationError("Failed to setup location tracking");
+    }
+  }, [networkStatus.isOnline, debouncedPositionUpdate, safeSetState]);
+
+  const cleanup = useCallback(() => {
+    isMountedRef.current = false;
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    const cleanupNetwork = monitorNetworkChanges(setNetworkStatus);
+    return cleanupNetwork;
+  }, []);
 
-    const options = {
-      enableHighAccuracy: true,
-      timeout: 20000,
-      maximumAge: networkStatus.isOnline ? 30000 : 60000, // Increase cache time when offline
+  useEffect(() => {
+    isMountedRef.current = true;
+    initializeGeolocation();
+
+    // Cleanup on unmount
+    return cleanup;
+  }, [initializeGeolocation, cleanup]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        cleanup();
+      } else {
+        isMountedRef.current = true;
+        initializeGeolocation();
+      }
     };
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        // Wrap the position update in a debounced function
-        setTimeout(() => debouncedPositionUpdate(pos), 300);
-      },
-      (error) => {
-        console.error("Geolocation error:", error);
-      },
-      options
-    );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [cleanup, initializeGeolocation]);
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [debouncedPositionUpdate, networkStatus.isOnline]);
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        cleanup();
+        isMountedRef.current = true;
+        initializeGeolocation();
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, [cleanup, initializeGeolocation]);
+
+  if (locationError) {
+    console.log("Location Error:", locationError);
+    // Optionally show error UI or retry
+    if (locationError === "Location request timed out") {
+      setTimeout(initializeGeolocation, 5000);
+    }
+  }
 
   if (!position || isOutOfBounds || !isVisible) return null
 
