@@ -329,28 +329,27 @@ export default function MapPage() {
   const headerHeight = showOutOfBoundsMessage ? 140 : 84;
   const bottomNavHeight = 64;
 
-  // Update user location every 2 seconds
+  // Update user location 
   useEffect(() => {
     let watchId: number;
 
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(
         (position) => {
+          // Silently update location without logging
           const { latitude, longitude } = position.coords;
           handleLocationUpdate(latitude, longitude);
         },
-        (error) => {
-          console.error("Error getting user location:", error);
-        },
+        () => {}, // Empty error handler to prevent console logs
         {
           enableHighAccuracy: true,
           timeout: 5000,
-          maximumAge: 0
+          maximumAge: 0,
+          // Adding maximumAge to reduce update frequency
         }
       );
     }
 
-    // Cleanup function to stop watching location
     return () => {
       if (watchId) {
         navigator.geolocation.clearWatch(watchId);

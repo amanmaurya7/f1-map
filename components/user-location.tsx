@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-function-type */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useCallback } from "react"
 import { isWithinBounds, convertToPixelPosition } from "../utils/coordinates"
-import { getNetworkStatus, monitorNetworkChanges } from '../utils/network'
 
 interface UserLocationProps {
   mapWidth: number
@@ -42,20 +43,25 @@ export function UserLocation({
     left: offset.left ?? 0
   }
 
+  // Debounce function
+  const debounce = useCallback((func: Function, wait: number) => {
+    let timeout: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  }, []);
+
   useEffect(() => {
-    getNetworkStatus().then(setNetworkStatus);
-    return monitorNetworkChanges(setNetworkStatus);
+    return () => {};
   }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
 
     let lastUpdate = 0;
-    let lastPosition: GeolocationPosition | null = null;
-    const DEBUG = false; // Set to true only when debugging
-
-    const MIN_UPDATE_INTERVAL = 30000; // Increased to 30 seconds
-    const MIN_DISTANCE_CHANGE = 10; // Increased to 10 meters
+    const MIN_UPDATE_INTERVAL = 500; // 500ms debounce time
+    const MIN_DISTANCE_CHANGE = 10; // 10 meters minimum change
 
     const calculateDistance = (pos1: GeolocationPosition, pos2: GeolocationPosition) => {
       const R = 6371e3; // Earth's radius in meters
@@ -72,13 +78,15 @@ export function UserLocation({
       return R * c;
     };
 
-    const handlePositionUpdate = (pos: GeolocationPosition) => {
+    let lastPosition: GeolocationPosition | null = null;
+
+    const debouncedPositionUpdate = debounce((pos: GeolocationPosition) => {
       const now = Date.now();
       
-      // Skip updates if not enough time has passed
+      // Skip if not enough time has passed
       if (now - lastUpdate < MIN_UPDATE_INTERVAL) return;
-      
-      // Skip updates if position hasn't changed enough
+
+      // Skip if position hasn't changed enough
       if (lastPosition) {
         const distance = calculateDistance(lastPosition, pos);
         if (distance < MIN_DISTANCE_CHANGE) return;
@@ -86,28 +94,15 @@ export function UserLocation({
 
       lastUpdate = now;
       lastPosition = pos;
-      
-      // Only update state if bounds changed
+
       const withinBounds = isWithinBounds(pos.coords.latitude, pos.coords.longitude);
-      if (withinBounds !== !isOutOfBounds) {
-        setIsOutOfBounds(!withinBounds);
-      }
+      setIsOutOfBounds(!withinBounds);
       
-      // Only update position if it's valid
       if (withinBounds) {
         setPosition(pos);
         onLocationUpdate?.(pos.coords.latitude, pos.coords.longitude);
       }
-
-      // Only log in debug mode
-      if (DEBUG) {
-        console.log('Position updated:', {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy
-        });
-      }
-    };
+    }, MIN_UPDATE_INTERVAL);
 
     const options = {
       enableHighAccuracy: true,
@@ -116,15 +111,15 @@ export function UserLocation({
     };
 
     const watchId = navigator.geolocation.watchPosition(
-      handlePositionUpdate,
+      debouncedPositionUpdate,
       (error) => {
-        if (DEBUG) console.error("Geolocation error:", error);
+        console.error("Geolocation error:", error);
       },
       options
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [onLocationUpdate]);
+  }, [debounce, onLocationUpdate]);
 
   if (!position || isOutOfBounds || !isVisible) return null
 
